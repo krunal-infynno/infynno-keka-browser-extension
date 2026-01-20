@@ -1,8 +1,6 @@
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect } from "react";
 import {
   format,
-  differenceInMinutes,
-  addMinutes,
   startOfMonth,
   endOfMonth,
   eachDayOfInterval,
@@ -11,64 +9,12 @@ import {
   parseISO,
 } from "date-fns";
 import "./App.css";
-
-interface TimeEntry {
-  actualTimestamp: string;
-  timestamp: string;
-  punchStatus: number;
-}
-
-interface LeaveDetail {
-  leaveTypeName: string;
-  leaveDayStatus: number;
-  startTime?: string;
-  endTime?: string;
-}
-
-interface AttendanceData {
-  attendanceDate: string;
-  timeEntries: TimeEntry[];
-  leaveDayStatuses: number[];
-  leaveDetails: LeaveDetail[];
-  totalEffectiveHours?: number;
-}
-
-interface TimePair {
-  startTime: string;
-  endTime: string;
-  duration: string;
-  durationMinutes: number;
-}
-
-interface Break {
-  startTime: string;
-  endTime: string;
-  duration: string;
-}
-
-interface Metrics {
-  totalWorked: string;
-  remaining: string;
-  estCompletion: string;
-  isCompleted: boolean;
-  isCloseToCompletion: boolean;
-  totalWorkedStatus: "yellow" | "green" | "red";
-  isOvertime: boolean;
-  overtimeMinutes: number;
-}
-
-interface LeaveTimeInfo {
-  normalLeaveTime: string;
-  earlyLeaveTime: string;
-}
+import type { Metrics, LeaveTimeInfo } from "./types";
 
 function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [attendanceData, setAttendanceData] = useState<AttendanceData[]>([]);
-  const [timePairs, setTimePairs] = useState<TimePair[]>([]);
-  const [breaks, setBreaks] = useState<Break[]>([]);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [leaveTimeInfo, setLeaveTimeInfo] = useState<LeaveTimeInfo | null>(
     null
@@ -77,10 +23,6 @@ function App() {
   const [isHalfDay, setIsHalfDay] = useState(false);
   const [totalWorkedMinutes, setTotalWorkedMinutes] = useState(0);
   const [isHalfDayLoaded, setIsHalfDayLoaded] = useState(false);
-  const [workStartTime, setWorkStartTime] = useState<string | null>(null);
-  const [unpairedInEntry, setUnpairedInEntry] = useState<TimeEntry | null>(
-    null
-  );
   const [activeTab, setActiveTab] = useState<"today" | "monthly">("today");
   const [holidays, setHolidays] = useState<string[]>([]);
   const [leaveDaysCount, setLeaveDaysCount] = useState<number>(0);
@@ -105,7 +47,7 @@ function App() {
         const key = `halfDay_${today}`;
         const result = await browser.storage.local.get(key);
         if (result[key] !== undefined) {
-          setIsHalfDay(result[key]);
+          setIsHalfDay(!!result[key]);
         }
         setIsHalfDayLoaded(true);
       } catch (err) {
@@ -133,407 +75,101 @@ function App() {
   }, [isHalfDay, isHalfDayLoaded]);
 
   useEffect(() => {
-    const fetchAccessToken = async () => {
+    const initializePopup = async () => {
       try {
-        // Query all tabs and filter for infynno.keka.com
-        const allTabs = await browser.tabs.query({});
-        const kekaTabs = allTabs.filter(
-          (tab) =>
-            tab.url &&
-            (tab.url.includes("infynno.keka.com") ||
-              tab.url.includes("*.infynno.keka.com"))
-        );
-
-        if (kekaTabs.length === 0) {
-          setError("Please open infynno.keka.com in a tab");
-          setLoading(false);
-          return;
-        }
-
-        // Use the first matching tab (prefer active tab if available)
-        const activeTab = kekaTabs.find((tab) => tab.active) || kekaTabs[0];
-        const tabId = activeTab.id;
-
-        if (!tabId) {
-          setError("Could not get tab ID");
-          setLoading(false);
-          return;
-        }
-
-        // Execute script directly in the page context to read localStorage
-        const results = await browser.scripting.executeScript({
-          target: { tabId },
-          func: () => {
-            return localStorage.getItem("access_token");
-          },
-        });
-
-        if (results && results[0]?.result) {
-          const token = results[0].result;
-          setAccessToken(token);
-          // Fetch attendance data
-          fetchAttendanceData(token);
+        // Try to get access token from storage (set by background)
+        const storedToken = await browser.storage.local.get('access_token');
+        if (storedToken.access_token) {
+          setAccessToken(storedToken.access_token as string);
         } else {
-          setError("No access token found in localStorage");
-          setLoading(false);
-        }
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Failed to fetch access token";
-        // Show the actual error for debugging
-        setError(`Error: ${errorMessage}`);
-        console.error("Error fetching access token:", err);
-        setLoading(false);
-      }
-    };
+          // Fallback: try to get token from Keka tab
+          const allTabs = await browser.tabs.query({});
+          const kekaTabs = allTabs.filter(
+            (tab) =>
+              tab.url &&
+              (tab.url.includes("infynno.keka.com") ||
+                tab.url.includes("*.infynno.keka.com"))
+          );
 
-    const fetchAttendanceData = async (token: string) => {
-      try {
-        const response = await fetch(
-          "https://infynno.keka.com/k/attendance/api/mytime/attendance/summary",
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
+          if (kekaTabs.length === 0) {
+            setError("Please open infynno.keka.com in a tab and log in");
+            setLoading(false);
+            return;
           }
-        );
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error("API error response:", errorText);
-          throw new Error(
-            `API request failed: ${response.status} - ${errorText}`
-          );
-        }
+          const activeTab = kekaTabs.find((tab) => tab.active) || kekaTabs[0];
+          const tabId = activeTab.id;
 
-        const responseData = await response.json();
+          if (!tabId) {
+            setError("Could not get tab ID");
+            setLoading(false);
+            return;
+          }
 
-        // Check if response has a data property
-        if (!responseData || !responseData.data) {
-          console.error("Expected response.data but got:", responseData);
-          throw new Error(
-            `API response does not have a data property. Got: ${typeof responseData}`
-          );
-        }
-
-        const data = responseData.data;
-
-        // Check if data is an array
-        if (!Array.isArray(data)) {
-          console.error("Expected array but got:", typeof data, data);
-          throw new Error(
-            `API response.data is not an array. Got: ${typeof data}`
-          );
-        }
-
-        setAttendanceData(data);
-
-        // Get the last entry (most recent attendance record)
-        if (data.length === 0) {
-          console.log("No attendance records found");
-          setTimePairs([]);
-          setLoading(false);
-          return;
-        }
-
-        const lastEntry = data[data.length - 1];
-
-        // Pair up start and end times from timeEntries of the last entry
-        const pairs: TimePair[] = [];
-        let currentStart: TimeEntry | null = null;
-        let unpairedInEntry: TimeEntry | null = null;
-        let firstWorkStartTime: string | null = null;
-
-        if (lastEntry.timeEntries && Array.isArray(lastEntry.timeEntries)) {
-          lastEntry.timeEntries.forEach((entry: TimeEntry) => {
-            if (!entry.actualTimestamp) return;
-
-            // punchStatus 0 = In (start), 1 = Out (end)
-            if (entry.punchStatus === 0) {
-              // Start time
-              currentStart = entry;
-              // Track the first work start time
-              if (!firstWorkStartTime) {
-                firstWorkStartTime = entry.actualTimestamp;
-              }
-            } else if (entry.punchStatus === 1 && currentStart) {
-              // End time - create a pair
-              const startDate = new Date(currentStart.actualTimestamp);
-              const endDate = new Date(entry.actualTimestamp);
-              const totalMinutes = differenceInMinutes(endDate, startDate);
-              const hours = Math.floor(totalMinutes / 60);
-              const minutes = totalMinutes % 60;
-              const duration = `${hours}h ${minutes}m`;
-
-              pairs.push({
-                startTime: currentStart.actualTimestamp,
-                endTime: entry.actualTimestamp,
-                duration,
-                durationMinutes: totalMinutes,
-              });
-
-              currentStart = null; // Reset for next pair
-            }
+          const results = await browser.scripting.executeScript({
+            target: { tabId },
+            func: () => localStorage.getItem("access_token"),
           });
 
-          // Check if there's an unpaired "In" entry (no out record)
-          if (currentStart) {
-            unpairedInEntry = currentStart;
-          }
-        } else {
-          console.warn(
-            "No timeEntries found in last entry or it's not an array"
-          );
-        }
-
-        setTimePairs(pairs);
-
-        // Set clocked in status
-        setIsClockedIn(!!unpairedInEntry);
-        setUnpairedInEntry(unpairedInEntry);
-
-        // Store the work start time
-        if (firstWorkStartTime) {
-          setWorkStartTime(firstWorkStartTime);
-        }
-
-        // Calculate breaks between consecutive time pairs
-        const breakList: Break[] = [];
-        for (let i = 0; i < pairs.length - 1; i++) {
-          const currentPair = pairs[i];
-          const nextPair = pairs[i + 1];
-
-          // Break is from end of current pair to start of next pair
-          const breakStart = new Date(currentPair.endTime);
-          const breakEnd = new Date(nextPair.startTime);
-          const breakMinutes = differenceInMinutes(breakEnd, breakStart);
-
-          if (breakMinutes > 0) {
-            const breakHours = Math.floor(breakMinutes / 60);
-            const breakMins = breakMinutes % 60;
-            let breakDuration: string;
-
-            if (breakHours > 0 && breakMins > 0) {
-              breakDuration = `${breakHours} hr ${breakMins} min`;
-            } else if (breakHours > 0) {
-              breakDuration = `${breakHours} hr`;
-            } else {
-              breakDuration = `${breakMins} min`;
-            }
-
-            breakList.push({
-              startTime: currentPair.endTime,
-              endTime: nextPair.startTime,
-              duration: breakDuration,
-            });
-          }
-        }
-
-        // Check for break after the last pair if there's an unpaired "In" entry
-        if (pairs.length > 0 && unpairedInEntry) {
-          const lastPair = pairs[pairs.length - 1];
-          const breakStart = new Date(lastPair.endTime);
-          const breakEnd = new Date(unpairedInEntry.actualTimestamp);
-          const breakMinutes = differenceInMinutes(breakEnd, breakStart);
-
-          if (breakMinutes > 0) {
-            const breakHours = Math.floor(breakMinutes / 60);
-            const breakMins = breakMinutes % 60;
-            let breakDuration: string;
-
-            if (breakHours > 0 && breakMins > 0) {
-              breakDuration = `${breakHours} hr ${breakMins} min`;
-            } else if (breakHours > 0) {
-              breakDuration = `${breakHours} hr`;
-            } else {
-              breakDuration = `${breakMins} min`;
-            }
-
-            breakList.push({
-              startTime: lastPair.endTime,
-              endTime: unpairedInEntry.actualTimestamp,
-              duration: breakDuration,
-            });
-          }
-        }
-
-        setBreaks(breakList);
-
-        // Determine target based on leave status
-        // Check if it's an early leave day (has leave with early/half day status)
-        const hasLeave =
-          lastEntry.leaveDayStatuses && lastEntry.leaveDayStatuses.length > 0;
-        let DAILY_TARGET_MINUTES = 8 * 60 + 15; // Default: 8h 15m = 495 minutes
-        let targetType = "Normal (8h 15m)";
-
-        if (
-          hasLeave &&
-          lastEntry.leaveDetails &&
-          lastEntry.leaveDetails.length > 0
-        ) {
-          const leaveDetail = lastEntry.leaveDetails[0];
-          const leaveTypeName = leaveDetail.leaveTypeName || "";
-
-          // Check if it's Early Leave (minimum 7h) or Normal Leave (8h 15m)
-          const isEarlyLeave =
-            leaveTypeName.toLowerCase().includes("early") ||
-            leaveTypeName.toLowerCase().includes("half");
-
-          if (isEarlyLeave) {
-            // Early Leave = 7 hours minimum
-            DAILY_TARGET_MINUTES = 7 * 60; // 420 minutes
-            targetType = "Early Leave (7h)";
+          if (results && results[0]?.result) {
+            const token = results[0].result;
+            setAccessToken(token);
+            // Store token for background service
+            await browser.storage.local.set({ access_token: token });
           } else {
-            // Normal Leave = 8h 15m
-            DAILY_TARGET_MINUTES = 8 * 60 + 15; // 495 minutes
-            targetType = "Normal (8h 15m)";
+            setError("No access token found. Please log in to Keka first.");
+            setLoading(false);
+            return;
           }
         }
 
-        // Calculate metrics using the appropriate target
-
-        // Calculate total worked minutes
-        let calculatedTotalWorkedMinutes = pairs.reduce(
-          (sum, pair) => sum + pair.durationMinutes,
-          0
-        );
-
-        // If there's an unpaired "In" entry, add time from that entry to current time
-        if (unpairedInEntry) {
-          const startDate = new Date(unpairedInEntry.actualTimestamp);
-          const now = new Date();
-          const additionalMinutes = differenceInMinutes(now, startDate);
-          calculatedTotalWorkedMinutes += additionalMinutes;
-        }
-
-        setTotalWorkedMinutes(calculatedTotalWorkedMinutes);
+        // Load current metrics from storage (calculated by background)
+        await loadCurrentMetrics();
       } catch (err) {
-        const errorMessage =
-          err instanceof Error
-            ? err.message
-            : "Failed to fetch attendance data";
-        console.error("Error fetching attendance data:", err);
-        setError(`Error fetching attendance: ${errorMessage}`);
-      } finally {
+        const errorMessage = err instanceof Error ? err.message : "Failed to initialize";
+        setError(`Error: ${errorMessage}`);
+        console.error("Error initializing popup:", err);
         setLoading(false);
       }
     };
 
-    fetchAccessToken();
+    const loadCurrentMetrics = async () => {
+      try {
+        const storedData = await browser.storage.local.get([
+          'current_metrics',
+          'current_total_worked_minutes',
+          'current_is_clocked_in',
+          'current_leave_time_info',
+          'last_updated'
+        ]);
+
+        if (storedData.current_metrics) {
+          setMetrics(storedData.current_metrics as Metrics);
+          setTotalWorkedMinutes((storedData.current_total_worked_minutes as number) || 0);
+          setIsClockedIn(!!(storedData.current_is_clocked_in as boolean));
+          setLeaveTimeInfo(storedData.current_leave_time_info as LeaveTimeInfo | null);
+
+          // Check if data is recent (within last 5 minutes)
+          const lastUpdated = storedData.last_updated as number;
+          if (lastUpdated && Date.now() - lastUpdated > 5 * 60 * 1000) {
+            // Data is stale, trigger background check
+            browser.runtime.sendMessage({ type: 'FORCE_CHECK' }).catch(() => {
+              // Ignore errors if background is not available
+            });
+          }
+        }
+
+        setLoading(false);
+      } catch (error) {
+        console.error("Error loading metrics:", error);
+        setLoading(false);
+      }
+    };
+
+    initializePopup();
   }, []);
 
-  // Recalculate metrics when half day toggle changes or when data is loaded
-  useEffect(() => {
-    if (!isHalfDayLoaded) return; // Wait for half day state to load
-    if (totalWorkedMinutes === 0 && timePairs.length === 0 && !isClockedIn)
-      return;
 
-    const HALF_DAY_TARGET = 4 * 60 + 30; // 4h 30m = 270 minutes
-    const NORMAL_TARGET = 8 * 60 + 15; // 8h 15m = 495 minutes
-    const MAX_ACCEPTABLE = 8 * 60 + 30; // 8h 30m = 510 minutes
-
-    const targetMinutes = isHalfDay ? HALF_DAY_TARGET : NORMAL_TARGET;
-    const remainingMinutes = Math.max(0, targetMinutes - totalWorkedMinutes);
-
-    // Check if overtime
-    const isOvertime = totalWorkedMinutes > targetMinutes;
-    const overtimeMinutes = isOvertime ? totalWorkedMinutes - targetMinutes : 0;
-
-    // Format total worked
-    const totalHours = Math.floor(totalWorkedMinutes / 60);
-    const totalMins = totalWorkedMinutes % 60;
-    const totalWorked = `${totalHours}h ${totalMins}m`;
-
-    // Format remaining
-    const remainingHours = Math.floor(remainingMinutes / 60);
-    const remainingMins = remainingMinutes % 60;
-    const remaining = `${remainingHours}h ${remainingMins}m`;
-
-    // Calculate estimated completion time
-    const now = new Date();
-    let estCompletionTime: Date;
-    if (isOvertime && workStartTime) {
-      // If in overtime, show when they should have completed (start time + target)
-      const startDate = new Date(workStartTime);
-      estCompletionTime = addMinutes(startDate, targetMinutes);
-    } else {
-      // If not in overtime, show current time + remaining time
-      estCompletionTime = addMinutes(now, remainingMinutes);
-    }
-    const estCompletion = format(estCompletionTime, "HH:mm");
-
-    // Determine status colors
-    const isCompleted = remainingMinutes === 0;
-    const isCloseToCompletion = remainingMinutes <= 30;
-
-    // Determine Total Worked status
-    let totalWorkedStatus: "yellow" | "green" | "red";
-    if (isHalfDay) {
-      // For half day: Yellow if < 4:30, Green if 4:30-4:45, Red if > 4:45
-      const HALF_DAY_MAX = 4 * 60 + 45; // 285 minutes
-      if (totalWorkedMinutes < HALF_DAY_TARGET) {
-        totalWorkedStatus = "yellow";
-      } else if (totalWorkedMinutes <= HALF_DAY_MAX) {
-        totalWorkedStatus = "green";
-      } else {
-        totalWorkedStatus = "red";
-      }
-    } else {
-      // For full day: Yellow if < 8:15, Green if 8:15-8:30, Red if > 8:30
-      if (totalWorkedMinutes < NORMAL_TARGET) {
-        totalWorkedStatus = "yellow";
-      } else if (totalWorkedMinutes <= MAX_ACCEPTABLE) {
-        totalWorkedStatus = "green";
-      } else {
-        totalWorkedStatus = "red";
-      }
-    }
-
-    setMetrics({
-      totalWorked,
-      remaining,
-      estCompletion,
-      isCompleted,
-      isCloseToCompletion,
-      totalWorkedStatus,
-      isOvertime,
-      overtimeMinutes,
-    });
-
-    // Calculate both leave times (when they can leave the office)
-    // Normal Leave Time: based on 8h 15m target (or 4h 30m if half day)
-    const normalTarget = isHalfDay ? HALF_DAY_TARGET : NORMAL_TARGET;
-    const normalRemainingMinutes = Math.max(
-      0,
-      normalTarget - totalWorkedMinutes
-    );
-    const normalLeaveTime = format(
-      addMinutes(now, normalRemainingMinutes),
-      "h:mm a"
-    );
-
-    // Early Leave Time: based on 7h target (or 3h 30m if half day)
-    const earlyTarget = isHalfDay ? 3 * 60 + 30 : 7 * 60; // 3h 30m for half day, 7h for full day
-    const earlyRemainingMinutes = Math.max(0, earlyTarget - totalWorkedMinutes);
-    const earlyLeaveTime = format(
-      addMinutes(now, earlyRemainingMinutes),
-      "h:mm a"
-    );
-
-    setLeaveTimeInfo({
-      normalLeaveTime,
-      earlyLeaveTime,
-    });
-  }, [
-    isHalfDay,
-    totalWorkedMinutes,
-    timePairs.length,
-    isClockedIn,
-    isHalfDayLoaded,
-    workStartTime,
-  ]);
 
   // Fetch holidays and calculate working days for monthly overview
   useEffect(() => {
@@ -542,6 +178,23 @@ function App() {
 
       setMonthlyLoading(true);
       try {
+        // Fetch attendance data for monthly calculations
+        const attendanceResponse = await fetch(
+          "https://infynno.keka.com/k/attendance/api/mytime/attendance/summary",
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!attendanceResponse.ok) {
+          throw new Error("Failed to fetch attendance data");
+        }
+
+        const attendanceDataResponse = await attendanceResponse.json();
+        const attendanceData = attendanceDataResponse.data || [];
         // Fetch holidays
         const holidaysResponse = await fetch(
           "https://infynno.keka.com/k/dashboard/api/dashboard/holidays",
@@ -564,7 +217,7 @@ function App() {
         const monthEnd = endOfMonth(now);
 
         if (holidaysData.data && Array.isArray(holidaysData.data)) {
-          holidaysData.data.forEach((holiday: { date: string }) => {
+          holidaysData.data.forEach((holiday: any) => {
             if (holiday.date) {
               const holidayDate = parseISO(holiday.date);
               // Only include holidays that fall within the current month
@@ -602,10 +255,7 @@ function App() {
             ) {
               // Filter for current month and negative durations (taken leaves)
               leaveData.data.leaveHistory.forEach(
-                (leaveEntry: {
-                  date: string;
-                  change: { duration: number; unit: number };
-                }) => {
+                (leaveEntry: any) => {
                   if (
                     leaveEntry.date &&
                     leaveEntry.change &&
@@ -680,7 +330,7 @@ function App() {
           const currentYear = now.getFullYear();
 
           // Filter attendance data for current month
-          const monthlyAttendance = attendanceData.filter((entry) => {
+          const monthlyAttendance = attendanceData.filter((entry: any) => {
             if (!entry.attendanceDate) return false;
             const entryDate = new Date(entry.attendanceDate);
             entryDate.setHours(0, 0, 0, 0);
@@ -694,7 +344,7 @@ function App() {
           // Sum totalEffectiveHours from API
           let totalHours = 0;
 
-          monthlyAttendance.forEach((entry) => {
+          monthlyAttendance.forEach((entry: any) => {
             if (
               entry.totalEffectiveHours !== undefined &&
               entry.totalEffectiveHours !== null
@@ -762,7 +412,7 @@ function App() {
     };
 
     fetchHolidaysAndCalculateWorkingDays();
-  }, [accessToken, activeTab, attendanceData]);
+  }, [accessToken, activeTab]);
 
   return (
     <div className="popup-container">
@@ -825,25 +475,23 @@ function App() {
                   )}
                 </div>
                 <div
-                  className={`metric-card ${
-                    metrics.isCompleted
+                  className={`metric-card ${metrics.isCompleted
                       ? "completed"
                       : metrics.isCloseToCompletion
-                      ? "warning"
-                      : ""
-                  }`}
+                        ? "warning"
+                        : ""
+                    }`}
                 >
                   <div className="metric-label">Remaining</div>
                   <div className="metric-value">{metrics.remaining}</div>
                 </div>
                 <div
-                  className={`metric-card ${
-                    metrics.isCompleted
+                  className={`metric-card ${metrics.isCompleted
                       ? "completed"
                       : metrics.isCloseToCompletion
-                      ? "warning"
-                      : ""
-                  }`}
+                        ? "warning"
+                        : ""
+                    }`}
                 >
                   <div className="metric-label">Est. Completion</div>
                   <div className="metric-value">{metrics.estCompletion}</div>
@@ -871,70 +519,6 @@ function App() {
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
-              {(timePairs.length > 0 || unpairedInEntry) && (
-                <div className="attendance-list">
-                  <h3 className="list-title">Time Entries</h3>
-                  <ul>
-                    {timePairs.map((pair, index) => (
-                      <Fragment key={`pair-${index}`}>
-                        <li className="time-entry">
-                          <span className="time-range">
-                            {format(new Date(pair.startTime), "HH:mm")} -{" "}
-                            {format(new Date(pair.endTime), "HH:mm")}
-                          </span>
-                          <span className="duration">({pair.duration})</span>
-                        </li>
-                        {breaks[index] && (
-                          <li className="break-entry">
-                            <span className="time-range">
-                              {format(
-                                new Date(breaks[index].startTime),
-                                "h:mm a"
-                              )}{" "}
-                              to{" "}
-                              {format(
-                                new Date(breaks[index].endTime),
-                                "h:mm a"
-                              )}
-                            </span>
-                            <span className="break-duration">
-                              → {breaks[index].duration}
-                            </span>
-                          </li>
-                        )}
-                      </Fragment>
-                    ))}
-                    {unpairedInEntry && (
-                      <li className="time-entry not-logged-out">
-                        <span className="time-range">
-                          {format(
-                            new Date(unpairedInEntry.actualTimestamp),
-                            "HH:mm"
-                          )}{" "}
-                          - not logged out
-                        </span>
-                        <span className="duration">
-                          (
-                          {(() => {
-                            const startDate = new Date(
-                              unpairedInEntry.actualTimestamp
-                            );
-                            const now = new Date();
-                            const totalMinutes = differenceInMinutes(
-                              now,
-                              startDate
-                            );
-                            const hours = Math.floor(totalMinutes / 60);
-                            const minutes = totalMinutes % 60;
-                            return `${hours}h ${minutes}m`;
-                          })()}
-                          )
-                        </span>
-                      </li>
-                    )}
-                  </ul>
                 </div>
               )}
             </>
@@ -973,12 +557,12 @@ function App() {
                   <div className="monthly-value">
                     {averageHours !== null && averageHours > 0
                       ? (() => {
-                          const hours = Math.floor(averageHours);
-                          const minutes = Math.round(
-                            (averageHours - hours) * 60
-                          );
-                          return `${hours}h ${minutes}m`;
-                        })()
+                        const hours = Math.floor(averageHours);
+                        const minutes = Math.round(
+                          (averageHours - hours) * 60
+                        );
+                        return `${hours}h ${minutes}m`;
+                      })()
                       : "—"}
                   </div>
                 </div>
@@ -987,12 +571,12 @@ function App() {
                   <div className="monthly-value">
                     {hoursNeededPerDay !== null && hoursNeededPerDay > 0
                       ? (() => {
-                          const hours = Math.floor(hoursNeededPerDay);
-                          const minutes = Math.round(
-                            (hoursNeededPerDay - hours) * 60
-                          );
-                          return `${hours}h ${minutes}m`;
-                        })()
+                        const hours = Math.floor(hoursNeededPerDay);
+                        const minutes = Math.round(
+                          (hoursNeededPerDay - hours) * 60
+                        );
+                        return `${hours}h ${minutes}m`;
+                      })()
                       : "—"}
                   </div>
                 </div>

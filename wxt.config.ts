@@ -4,7 +4,7 @@ import { defineConfig } from "wxt";
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
   manifest: {
-    permissions: ["scripting", "tabs", "storage"],
+    permissions: ["scripting", "tabs", "storage", "notifications", "alarms"],
     host_permissions: [
       "https://*.infynno.keka.com/*",
       "https://infynno.keka.com/*",
