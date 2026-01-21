@@ -1,8 +1,8 @@
 {
   "name": "infynno-keka",
-  "description": "manifest.json description",
+  "description": "A simple browser extension to track your work hours and breaks, Along with some useful features!",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -15,6 +15,7 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
+    "axios": "^1.13.2",
     "date-fns": "^4.1.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3"
