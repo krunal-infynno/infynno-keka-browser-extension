@@ -43,7 +43,7 @@ function App() {
       <header className="header">
         <div className="header-title">
           <span className="header-logo">🚀</span>
-          <span>{activeView === "settings" ? "Settings" : "Keka Pro"}</span>
+          <span>{activeView === "settings" ? "Settings" : "Keka Time Tracker"}</span>
         </div>
         <button
           className="icon-button"

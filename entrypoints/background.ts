@@ -66,7 +66,8 @@ async function getNotificationStates(): Promise<NotificationStates> {
     `last_overtime_minutes_${currentDay}`,
     `lunch_break_notified_${currentDay}`,
     `tea_break_notified_${currentDay}`,
-    `average_target_notified_${currentDay}`
+    `average_target_notified_${currentDay}`,
+    `token_expired_notified_${currentDay}`
   ];
 
   const result = await browser.storage.local.get(keys);
@@ -82,6 +83,7 @@ async function getNotificationStates(): Promise<NotificationStates> {
     lunchBreakNotifiedToday: Boolean(result[keys[7]]),
     teaBreakNotifiedToday: Boolean(result[keys[8]]),
     averageTargetNotifiedToday: Boolean(result[keys[9]]),
+    tokenExpiredNotifiedToday: Boolean(result[keys[10]]),
   };
 }
 
@@ -100,9 +102,48 @@ async function updateNotificationState(stateKey: keyof NotificationStates, value
     lunchBreakNotifiedToday: `lunch_break_notified_${currentDay}`,
     teaBreakNotifiedToday: `tea_break_notified_${currentDay}`,
     averageTargetNotifiedToday: `average_target_notified_${currentDay}`,
+    tokenExpiredNotifiedToday: `token_expired_notified_${currentDay}`,
   };
 
   await setInStorage(keyMap[stateKey], value);
+}
+
+// Helper to handle token expiration
+async function handleTokenExpiration(accessToken: string) {
+  try {
+    // 1. Try to find a fresh token in opened tabs
+    const kekaTabs = await browser.tabs.query({ url: "*://*.infynno.keka.com/*" });
+    if (kekaTabs.length > 0) {
+      const activeTab = kekaTabs.sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0))[0];
+      if (activeTab.id) {
+        const result = await browser.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          func: () => localStorage.getItem("access_token")
+        });
+
+        const freshToken = result[0]?.result;
+        if (freshToken && freshToken !== accessToken) {
+          await browser.storage.local.set({ access_token: freshToken });
+          console.log("Automatically refreshed expired token from tab.");
+          return; // Token refreshed, next tick will pick it up
+        }
+      }
+    }
+
+    // 2. If no tab/token found, notify user ONCE per day (only if token is actually missing or invalid)
+    const { tokenExpiredNotifiedToday } = await getNotificationStates();
+    if (!tokenExpiredNotifiedToday) {
+      await showNotification(
+        "Session Expired ⚠️",
+        "Please open Keka to refresh your daily session and resume tracking.",
+        true // require interaction so they see it
+      );
+      await updateNotificationState("tokenExpiredNotifiedToday", true);
+    }
+
+  } catch (e) {
+    console.error("Error handling token expiration:", e);
+  }
 }
 
 // Main notification logic (optimized)
@@ -113,8 +154,10 @@ async function runNotificationLogic() {
     const storageData = await browser.storage.local.get(storageKeys);
 
     const accessToken = storageData.access_token as string;
+
+    // If no access token at all, maybe try to find one? 
     if (!accessToken) {
-      // console.log('No access token available');
+      await handleTokenExpiration(""); // pass empty string to trigger search
       return;
     }
 
@@ -124,10 +167,17 @@ async function runNotificationLogic() {
     // Fetch fresh data
     // optimization: maybe we don't need holidays and leave EVERY minute, but for correctness of average calcs we fetch them.
     // In a real app we might cache these for the day.
-    const [attendanceData, holidaysData] = await Promise.all([
-      fetchAttendanceSummary(accessToken),
-      fetchHolidays(accessToken)
-    ]);
+    let attendanceData, holidaysData;
+    try {
+      [attendanceData, holidaysData] = await Promise.all([
+        fetchAttendanceSummary(accessToken),
+        fetchHolidays(accessToken)
+      ]);
+    } catch (error) {
+      console.error("Error fetching data, possibly expired token:", error);
+      await handleTokenExpiration(accessToken);
+      return;
+    }
 
     // Fetch leave summary for today to check if on leave (needed for monthly stats mostly)
     let leaveData = null;
@@ -140,7 +190,8 @@ async function runNotificationLogic() {
     }
 
     if (!attendanceData) {
-      console.log('Failed to fetch attendance data');
+      console.log('Failed to fetch attendance data - possibly expired token');
+      await handleTokenExpiration(accessToken);
       return;
     }
 

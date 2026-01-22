@@ -48,6 +48,7 @@ export interface NotificationStates {
   lunchBreakNotifiedToday: boolean;
   teaBreakNotifiedToday: boolean;
   averageTargetNotifiedToday: boolean;
+  tokenExpiredNotifiedToday: boolean;
 }
 
 export interface NotificationServiceProps {
