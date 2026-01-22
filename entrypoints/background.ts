@@ -17,6 +17,11 @@ function getCurrentWeek(): string {
 // Optimized notification helper
 async function showNotification(title: string, message: string, requireInteraction = false) {
   try {
+    const { notifications_enabled } = await browser.storage.local.get("notifications_enabled");
+    if (notifications_enabled !== true) {
+      return;
+    }
+
     if (!browser || !browser.notifications) {
       console.error("Notifications API not available");
       return;

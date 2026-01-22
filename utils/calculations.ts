@@ -1,5 +1,5 @@
 import { differenceInMinutes, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameMonth, format } from "date-fns";
-import type { AttendanceData, LeaveTimeInfo, Metrics, TimeEntry, TimePair, Break } from "./types";
+import type { AttendanceData, LeaveTimeInfo, Metrics, TimeEntry, TimePair, Break, HolidayResponse, LeaveResponse, MonthlyStats } from "./types";
 
 
 // Helper to calculate total minutes from attendance data
@@ -12,7 +12,7 @@ export const calculateMinutesFromAttendance = (attendanceData: AttendanceData[])
     }
 
     const lastEntry = attendanceData[attendanceData.length - 1];
-    let pairs: any[] = [];
+    let pairs: { startTime: string; endTime: string; durationMinutes: number }[] = [];
     let currentStart: TimeEntry | null = null;
     let unpairedInEntry: TimeEntry | null = null;
 
@@ -48,7 +48,8 @@ export const calculateMinutesFromAttendance = (attendanceData: AttendanceData[])
 
     // Add time from unpaired entry
     if (unpairedInEntry) {
-        const startDate = new Date((unpairedInEntry as any).actualTimestamp);
+        const entry = unpairedInEntry as TimeEntry;
+        const startDate = new Date(entry.actualTimestamp);
         const now = new Date();
         const additionalMinutes = Math.floor((now.getTime() - startDate.getTime()) / (1000 * 60));
         calculatedTotalWorkedMinutes += additionalMinutes;
@@ -143,9 +144,10 @@ export const calculateTimePairsAndBreaks = (
 
     // Check for break after the last pair if there's an unpaired "In" entry
     if (pairs.length > 0 && unpairedInEntry) {
+        const entry = unpairedInEntry as TimeEntry;
         const lastPair = pairs[pairs.length - 1];
         const breakStart = new Date(lastPair.endTime);
-        const breakEnd = new Date(unpairedInEntry.actualTimestamp);
+        const breakEnd = new Date(entry.actualTimestamp);
         const breakMinutes = differenceInMinutes(breakEnd, breakStart);
 
         if (breakMinutes > 0) {
@@ -163,7 +165,7 @@ export const calculateTimePairsAndBreaks = (
 
             breakList.push({
                 startTime: lastPair.endTime,
-                endTime: unpairedInEntry.actualTimestamp,
+                endTime: entry.actualTimestamp,
                 duration: breakDuration,
             });
         }
@@ -301,10 +303,10 @@ export const calculateMetrics = (attendanceData: AttendanceData[], halfDay: bool
 }
 
 export const processMonthlyStats = (
-    attendanceData: any[],
-    holidaysData: any,
-    leaveData: any
-) => {
+    attendanceData: AttendanceData[],
+    holidaysData: HolidayResponse | null,
+    leaveData: LeaveResponse | null
+): MonthlyStats => {
     const now = new Date();
     const monthStart = startOfMonth(now);
     const monthEnd = endOfMonth(now);
@@ -312,7 +314,7 @@ export const processMonthlyStats = (
     // Process Holidays
     const holidayDates: string[] = [];
     if (holidaysData?.data && Array.isArray(holidaysData.data)) {
-        holidaysData.data.forEach((holiday: any) => {
+        holidaysData.data.forEach((holiday) => {
             if (holiday.date) {
                 const holidayDate = parseISO(holiday.date);
                 if (isSameMonth(holidayDate, now)) {
@@ -329,7 +331,7 @@ export const processMonthlyStats = (
         leaveData?.data?.leaveHistory &&
         Array.isArray(leaveData.data.leaveHistory)
     ) {
-        leaveData.data.leaveHistory.forEach((leaveEntry: any) => {
+        leaveData.data.leaveHistory.forEach((leaveEntry) => {
             if (
                 leaveEntry.date &&
                 leaveEntry.change &&
@@ -377,7 +379,7 @@ export const processMonthlyStats = (
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
-        const monthlyAttendance = attendanceData.filter((entry: any) => {
+        const monthlyAttendance = attendanceData.filter((entry) => {
             if (!entry.attendanceDate) return false;
             const entryDate = new Date(entry.attendanceDate);
             entryDate.setHours(0, 0, 0, 0);
@@ -389,7 +391,7 @@ export const processMonthlyStats = (
         });
 
         let totalHours = 0;
-        monthlyAttendance.forEach((entry: any) => {
+        monthlyAttendance.forEach((entry) => {
             if (entry.totalEffectiveHours !== undefined && entry.totalEffectiveHours !== null) {
                 totalHours += entry.totalEffectiveHours;
             }

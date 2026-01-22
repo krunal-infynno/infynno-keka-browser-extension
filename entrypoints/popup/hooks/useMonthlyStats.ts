@@ -14,7 +14,7 @@ interface MonthlyStats {
     loading: boolean;
 }
 
-export const useMonthlyStats = (accessToken: string | null, activeTab: string) => {
+export const useMonthlyStats = (accessToken: string | null) => {
     const [stats, setStats] = useState<MonthlyStats>({
         holidays: [],
         leaveDaysCount: 0,
@@ -28,7 +28,7 @@ export const useMonthlyStats = (accessToken: string | null, activeTab: string) =
 
     useEffect(() => {
         const loadStats = async () => {
-            if (!accessToken || activeTab !== "monthly") return;
+            if (!accessToken) return;
 
             setStats((prev) => ({ ...prev, loading: true }));
 
@@ -69,7 +69,7 @@ export const useMonthlyStats = (accessToken: string | null, activeTab: string) =
         };
 
         loadStats();
-    }, [accessToken, activeTab]);
+    }, [accessToken]);
 
     return stats;
 };

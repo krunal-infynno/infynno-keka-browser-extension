@@ -7,11 +7,12 @@ interface TodayOverviewProps {
     error: string | null;
     metrics: Metrics | null;
     isHalfDay: boolean;
-    setIsHalfDay: (value: boolean) => void;
     leaveTimeInfo: LeaveTimeInfo | null;
     timePairs: TimePair[];
     breaks: Break[];
     unpairedInEntry: TimeEntry | null;
+    totalWorkedMinutes: number;
+    hoursNeededPerDay: number | null;
 }
 
 export default function TodayOverview({
@@ -19,11 +20,12 @@ export default function TodayOverview({
     error,
     metrics,
     isHalfDay,
-    setIsHalfDay,
     leaveTimeInfo,
     timePairs,
     breaks,
     unpairedInEntry,
+    totalWorkedMinutes,
+    hoursNeededPerDay,
 }: TodayOverviewProps) {
     if (loading) {
         return <p className="loading">Loading attendance data...</p>;
@@ -39,17 +41,6 @@ export default function TodayOverview({
 
     return (
         <>
-            <div className="toggle-container">
-                <label className="toggle-label">
-                    <input
-                        type="checkbox"
-                        className="toggle-switch"
-                        checked={isHalfDay}
-                        onChange={(e) => setIsHalfDay(e.target.checked)}
-                    />
-                    <span className="toggle-text">Half Day</span>
-                </label>
-            </div>
             <div className="metrics-row">
                 <div
                     className={`metric-card total-worked-${metrics.totalWorkedStatus}`}
@@ -107,6 +98,31 @@ export default function TodayOverview({
                                 {leaveTimeInfo.earlyLeaveTime}
                             </div>
                         </div>
+                        {hoursNeededPerDay && (
+                            <div className="leave-card" style={{ borderColor: '#818cf8', backgroundColor: '#e0e7ff' }}>
+                                <div className="leave-label" style={{ color: '#3730a3' }}>Monthly Avg Target</div>
+                                <div className="leave-sub-label" style={{ color: '#4338ca' }}>
+                                    ({(() => {
+                                        const h = Math.floor(hoursNeededPerDay);
+                                        const m = Math.round((hoursNeededPerDay - h) * 60);
+                                        return `${h}h ${m}m`;
+                                    })()})
+                                </div>
+                                <div className="leave-time">
+                                    {(() => {
+                                        const now = new Date();
+                                        const targetMinutes = Math.floor(hoursNeededPerDay * 60);
+                                        const remainingMinutes = Math.max(0, targetMinutes - totalWorkedMinutes);
+                                        const leaveTime = new Date(now.getTime() + (remainingMinutes * 60 * 1000));
+                                        const h = leaveTime.getHours();
+                                        const m = leaveTime.getMinutes().toString().padStart(2, '0');
+                                        const ampm = h >= 12 ? 'pm' : 'am';
+                                        const h12 = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+                                        return `${h12}:${m} ${ampm}`;
+                                    })()}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

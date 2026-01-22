@@ -7,9 +7,15 @@ export interface LeaveDetail {
   endTime?: string;
 }
 
+export interface TimeEntry {
+  actualTimestamp: string;
+  timestamp: string;
+  punchStatus: number;
+}
+
 export interface AttendanceData {
   attendanceDate: string;
-  timeEntries: any[];
+  timeEntries: TimeEntry[];
   leaveDayStatuses: number[];
   leaveDetails: LeaveDetail[];
   totalEffectiveHours?: number;
@@ -52,19 +58,13 @@ export interface NotificationServiceProps {
   isHalfDay: boolean;
   totalWorkedMinutes: number;
   isHalfDayLoaded: boolean;
-  attendanceData: any[];
+  attendanceData: AttendanceData[];
   totalWorkingDays: number | null;
   currentWorkingDay: number | null;
   remainingWorkingDays: number | null;
   averageHours: number | null;
   notificationStates: NotificationStates;
   setNotificationStates: React.Dispatch<React.SetStateAction<NotificationStates>>;
-}
-
-export interface TimeEntry {
-  actualTimestamp: string;
-  timestamp: string;
-  punchStatus: number;
 }
 
 export interface TimePair {
@@ -78,4 +78,36 @@ export interface Break {
   startTime: string;
   endTime: string;
   duration: string;
+}
+
+export interface Holiday {
+  date: string;
+  [key: string]: any;
+}
+
+export interface HolidayResponse {
+  data: Holiday[];
+}
+
+export interface LeaveHistoryEntry {
+  date: string;
+  change?: {
+    duration: number;
+  };
+}
+
+export interface LeaveResponse {
+  data: {
+    leaveHistory: LeaveHistoryEntry[];
+  };
+}
+
+export interface MonthlyStats {
+  holidayDates: string[];
+  leaveCount: number;
+  totalWorkingDaysCount: number;
+  currentWorkingDayCount: number;
+  remainingWorkingDaysCount: number;
+  averageHours: number | null;
+  hoursNeededPerDay: number | null;
 }
