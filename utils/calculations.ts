@@ -258,14 +258,26 @@ export const generateMetricsFromMinutes = (
 export const calculateLeaveTimeInfo = (totalWorkedMinutes: number, halfDay: boolean): LeaveTimeInfo => {
     const now = new Date();
     const normalTarget = halfDay ? 4 * 60 + 30 : 8 * 60 + 15;
-    const normalRemainingMinutes = Math.max(0, normalTarget - totalWorkedMinutes);
-    const normalLeaveTime = new Date(now.getTime() + (normalRemainingMinutes * 60 * 1000));
-    const normalLeaveTimeStr = `${normalLeaveTime.getHours() > 12 ? normalLeaveTime.getHours() - 12 : normalLeaveTime.getHours()}:${normalLeaveTime.getMinutes().toString().padStart(2, '0')} ${normalLeaveTime.getHours() >= 12 ? 'pm' : 'am'}`;
+
+    let normalLeaveTimeStr: string;
+    if (totalWorkedMinutes >= normalTarget) {
+        normalLeaveTimeStr = "You can leave";
+    } else {
+        const normalRemainingMinutes = Math.max(0, normalTarget - totalWorkedMinutes);
+        const normalLeaveTime = new Date(now.getTime() + (normalRemainingMinutes * 60 * 1000));
+        normalLeaveTimeStr = `${normalLeaveTime.getHours() > 12 ? normalLeaveTime.getHours() - 12 : normalLeaveTime.getHours()}:${normalLeaveTime.getMinutes().toString().padStart(2, '0')} ${normalLeaveTime.getHours() >= 12 ? 'pm' : 'am'}`;
+    }
 
     const earlyTarget = halfDay ? 3 * 60 + 30 : 7 * 60;
-    const earlyRemainingMinutes = Math.max(0, earlyTarget - totalWorkedMinutes);
-    const earlyLeaveTime = new Date(now.getTime() + (earlyRemainingMinutes * 60 * 1000));
-    const earlyLeaveTimeStr = `${earlyLeaveTime.getHours() > 12 ? earlyLeaveTime.getHours() - 12 : earlyLeaveTime.getHours()}:${earlyLeaveTime.getMinutes().toString().padStart(2, '0')} ${earlyLeaveTime.getHours() >= 12 ? 'pm' : 'am'}`;
+
+    let earlyLeaveTimeStr: string;
+    if (totalWorkedMinutes >= earlyTarget) {
+        earlyLeaveTimeStr = "You can leave";
+    } else {
+        const earlyRemainingMinutes = Math.max(0, earlyTarget - totalWorkedMinutes);
+        const earlyLeaveTime = new Date(now.getTime() + (earlyRemainingMinutes * 60 * 1000));
+        earlyLeaveTimeStr = `${earlyLeaveTime.getHours() > 12 ? earlyLeaveTime.getHours() - 12 : earlyLeaveTime.getHours()}:${earlyLeaveTime.getMinutes().toString().padStart(2, '0')} ${earlyLeaveTime.getHours() >= 12 ? 'pm' : 'am'}`;
+    }
 
     return {
         normalLeaveTime: normalLeaveTimeStr,

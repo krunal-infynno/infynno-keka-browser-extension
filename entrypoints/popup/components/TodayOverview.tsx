@@ -112,6 +112,11 @@ export default function TodayOverview({
                                     {(() => {
                                         const now = new Date();
                                         const targetMinutes = Math.floor(hoursNeededPerDay * 60);
+
+                                        if (totalWorkedMinutes >= targetMinutes) {
+                                            return "You can leave";
+                                        }
+
                                         const remainingMinutes = Math.max(0, targetMinutes - totalWorkedMinutes);
                                         const leaveTime = new Date(now.getTime() + (remainingMinutes * 60 * 1000));
                                         const h = leaveTime.getHours();
