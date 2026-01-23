@@ -42,8 +42,8 @@ function App() {
       {/* Header Area */}
       <header className="header">
         <div className="header-title">
-          <span className="header-logo">🚀</span>
-          <span>{activeView === "settings" ? "Settings" : "Keka Pro"}</span>
+          <img src="/icon/32.png" alt="logo" className="header-logo" />
+          <span>{activeView === "settings" ? "Settings" : "Kivo"}</span>
         </div>
         <button
           className="icon-button"

@@ -22,15 +22,19 @@ export const useAuth = (): UseAuthResult => {
                     return;
                 }
 
+                const { keka_domain } = await browser.storage.local.get("keka_domain");
+                const domain = (keka_domain as string) || "infynno.keka.com";
+                const hostname = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
                 const kekaTabs = await browser.tabs.query({
                     url: [
-                        "*://infynno.keka.com/*",
-                        "*://*.infynno.keka.com/*"
+                        `*://${hostname}/*`,
+                        `*://*.${hostname}/*`
                     ]
                 });
 
                 if (kekaTabs.length === 0) {
-                    setError("Please open infynno.keka.com in a tab and log in");
+                    setError(`Please open Keka in a tab and log in`);
                     setLoading(false);
                     return;
                 }

@@ -1,5 +1,5 @@
 export default defineContentScript({
-  matches: ["*://*.infynno.keka.com/*", "*://infynno.keka.com/*"],
+  matches: ["*://*.keka.com/*"],
   main() {
     // Listen for messages from popup requesting access_token
     browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
