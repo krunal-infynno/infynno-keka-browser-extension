@@ -1,4 +1,16 @@
-const BASE_URL = 'https://infynno.keka.com';
+import { browser } from 'wxt/browser';
+import type { AttendanceData } from './types';
+
+const DEFAULT_DOMAIN = 'infynno.keka.com';
+
+const getBaseUrl = async () => {
+    const { keka_domain } = await browser.storage.local.get('keka_domain');
+    let domain = (keka_domain as string) || DEFAULT_DOMAIN;
+    if (!domain.startsWith('http')) {
+        domain = `https://${domain}`;
+    }
+    return domain.replace(/\/$/, '');
+};
 
 interface RequestOptions {
     method?: string;
@@ -7,7 +19,8 @@ interface RequestOptions {
 }
 
 const apiRequest = async (endpoint: string, token: string, options: RequestOptions = {}) => {
-    const url = `${BASE_URL}${endpoint}`;
+    const baseUrl = await getBaseUrl();
+    const url = `${baseUrl}${endpoint}`;
     const headers = {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
@@ -26,8 +39,6 @@ const apiRequest = async (endpoint: string, token: string, options: RequestOptio
 
     return response.json();
 };
-
-import type { AttendanceData } from './types';
 
 export const fetchAttendanceSummary = async (token: string): Promise<AttendanceData[] | null> => {
     try {
