@@ -82,7 +82,8 @@ export function NotificationService({
           `weekly_summary_notified_${currentWeek}`,
           `lunch_break_notified_${currentDay}`,
           `tea_break_notified_${currentDay}`,
-          `average_target_notified_${currentDay}`
+          `average_target_notified_${currentDay}`,
+          `token_expired_notified_${currentDay}`
         ];
 
         const result = await browser.storage.local.get(keys);
@@ -98,6 +99,7 @@ export function NotificationService({
           lunchBreakNotifiedToday: Boolean(result[keys[6]]),
           teaBreakNotifiedToday: Boolean(result[keys[7]]),
           averageTargetNotifiedToday: Boolean(result[keys[8]]),
+          tokenExpiredNotifiedToday: Boolean(result[keys[9]]),
         });
       } catch (err) {
         console.error("Error loading notification states:", err);
@@ -147,8 +149,8 @@ export function NotificationService({
         const justCompleted = totalWorkedMinutes >= targetMinutes;
         if (justCompleted) {
           const message = isHalfDay
-            ? "You've completed your half day target! You can leave now. 🎉"
-            : "You've completed your full day target (8h 15m)! You can leave now. 🎉";
+            ? "You've completed your half day target! 🎉"
+            : "You've completed your full day target (8h 15m)! 🎉";
           notificationsToShow.push({
             title: "Work Target Completed! 🎯",
             message,
@@ -173,7 +175,7 @@ export function NotificationService({
               if (totalWorkedMinutes >= neededMinutes) {
                 notificationsToShow.push({
                   title: "Daily Average Met! 🌟",
-                  message: "You can leave now yeahh!!! No worries, your monthly 8h 15m average will still be completed! 🥳",
+                  message: "Great job today! 🎉 You’ve already hit your daily average. Feel free to wrap up whenever you’re ready — your monthly 8h 15m average is still on track! 🥳",
                   stateKey: "averageTargetNotifiedToday",
                   storageKey: `average_target_notified_${currentDay}`
                 });

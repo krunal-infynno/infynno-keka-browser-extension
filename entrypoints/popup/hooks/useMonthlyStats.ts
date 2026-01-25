@@ -44,7 +44,7 @@ export const useMonthlyStats = (accessToken: string | null) => {
                 try {
                     leaveData = await fetchLeaveSummary(accessToken, currentDateStr);
                 } catch (e) {
-                    console.error("Failed to fetch leave data", e);
+                    // console.error("Failed to fetch leave data", e);
                 }
 
                 if (!attendanceData) throw new Error("Failed to fetch attendance");
@@ -63,7 +63,12 @@ export const useMonthlyStats = (accessToken: string | null) => {
                 });
 
             } catch (err) {
-                console.error("Error loading monthly stats:", err);
+                // Suppress error logging
+                /*
+                if (err instanceof Error && err.message !== 'Unauthorized') {
+                    console.error("Error loading monthly stats:", err);
+                }
+                */
                 setStats((prev) => ({ ...prev, loading: false }));
             }
         };

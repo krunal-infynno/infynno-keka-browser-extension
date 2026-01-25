@@ -114,7 +114,7 @@ export default function TodayOverview({
                                         const targetMinutes = Math.floor(hoursNeededPerDay * 60);
 
                                         if (totalWorkedMinutes >= targetMinutes) {
-                                            return "You can leave";
+                                            return "-";
                                         }
 
                                         const remainingMinutes = Math.max(0, targetMinutes - totalWorkedMinutes);

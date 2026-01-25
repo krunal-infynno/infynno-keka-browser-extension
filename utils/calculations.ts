@@ -261,7 +261,7 @@ export const calculateLeaveTimeInfo = (totalWorkedMinutes: number, halfDay: bool
 
     let normalLeaveTimeStr: string;
     if (totalWorkedMinutes >= normalTarget) {
-        normalLeaveTimeStr = "You can leave";
+        normalLeaveTimeStr = "-";
     } else {
         const normalRemainingMinutes = Math.max(0, normalTarget - totalWorkedMinutes);
         const normalLeaveTime = new Date(now.getTime() + (normalRemainingMinutes * 60 * 1000));
@@ -272,7 +272,7 @@ export const calculateLeaveTimeInfo = (totalWorkedMinutes: number, halfDay: bool
 
     let earlyLeaveTimeStr: string;
     if (totalWorkedMinutes >= earlyTarget) {
-        earlyLeaveTimeStr = "You can leave";
+        earlyLeaveTimeStr = "-";
     } else {
         const earlyRemainingMinutes = Math.max(0, earlyTarget - totalWorkedMinutes);
         const earlyLeaveTime = new Date(now.getTime() + (earlyRemainingMinutes * 60 * 1000));
@@ -337,7 +337,7 @@ export const processMonthlyStats = (
     }
 
     // Process Leaves
-    const leaveDates = new Set<string>();
+    const leaveDurations = new Map<string, number>();
     let leaveCount = 0;
     if (
         leaveData?.data?.leaveHistory &&
@@ -351,8 +351,10 @@ export const processMonthlyStats = (
             ) {
                 const leaveDate = parseISO(leaveEntry.date);
                 if (isSameMonth(leaveDate, now)) {
-                    leaveDates.add(leaveEntry.date);
-                    leaveCount += Math.abs(leaveEntry.change.duration);
+                    const duration = Math.abs(leaveEntry.change.duration);
+                    leaveCount += duration;
+                    const existing = leaveDurations.get(leaveEntry.date) || 0;
+                    leaveDurations.set(leaveEntry.date, existing + duration);
                 }
             }
         });
@@ -363,23 +365,34 @@ export const processMonthlyStats = (
     today.setHours(0, 0, 0, 0);
     const allDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-    const weekdays = allDays.filter((day) => {
+    let totalWorkingDaysCount = 0;
+    let currentWorkingDayCount = 0;
+
+    allDays.forEach((day) => {
         const dayOfWeek = getDay(day);
-        return dayOfWeek >= 1 && dayOfWeek <= 5;
-    });
+        // Skip weekends (0 is Sunday, 6 is Saturday)
+        if (dayOfWeek === 0 || dayOfWeek === 6) return;
 
-    const allWorkingDays = weekdays.filter((day) => {
         const dayStr = format(day, "yyyy-MM-dd");
-        return !holidayDates.includes(dayStr) && !leaveDates.has(dayStr);
-    });
 
-    const totalWorkingDaysCount = allWorkingDays.length;
+        // Skip holidays
+        if (holidayDates.includes(dayStr)) return;
 
-    const currentWorkingDayCount = allWorkingDays.filter((day) => {
+        // Check for leave duration on this day
+        const leaveDuration = leaveDurations.get(dayStr) || 0;
+
+        // Calculate effective working day value (1 for full day, 0.5 for half day, etc.)
+        // Ensure strictly non-negative
+        const workingValue = Math.max(0, 1 - leaveDuration);
+
+        totalWorkingDaysCount += workingValue;
+
         const dayDate = new Date(day);
         dayDate.setHours(0, 0, 0, 0);
-        return dayDate < today;
-    }).length;
+        if (dayDate < today) {
+            currentWorkingDayCount += workingValue;
+        }
+    });
 
     const remainingWorkingDaysCount = totalWorkingDaysCount - currentWorkingDayCount;
 
@@ -435,6 +448,6 @@ export const processMonthlyStats = (
         currentWorkingDayCount,
         remainingWorkingDaysCount,
         averageHours: averageHours || null,
-        hoursNeededPerDay: hoursNeededPerDay > 0 ? hoursNeededPerDay : null, // keep null if 0/undefined implies N/A
+        hoursNeededPerDay: hoursNeededPerDay > 0 ? hoursNeededPerDay : null,
     };
 };

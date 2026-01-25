@@ -33,8 +33,12 @@ const apiRequest = async (endpoint: string, token: string, options: RequestOptio
         body: options.body ? JSON.stringify(options.body) : undefined,
     });
 
+    if (response.status === 401 || response.status === 403) {
+        throw new Error('Unauthorized');
+    }
+
     if (!response.ok) {
-        throw new Error(`API request failed: ${response.statusText}`);
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
 
     return response.json();
@@ -48,8 +52,8 @@ export const fetchAttendanceSummary = async (token: string): Promise<AttendanceD
         }
         return null;
     } catch (error) {
-        console.error('Error fetching attendance summary:', error);
-        return null; // Return null on failure to match previous behavior
+        // Silently fail to avoid "Errors" tab clutter. The caller will handle missing data.
+        return null;
     }
 };
 
@@ -57,7 +61,7 @@ export const fetchHolidays = async (token: string) => {
     try {
         return await apiRequest('/k/dashboard/api/dashboard/holidays', token);
     } catch (error) {
-        console.error('Error fetching holidays:', error);
+        // Re-throw so caller knows it failed, but do not log console.error here
         throw error;
     }
 }
@@ -66,7 +70,7 @@ export const fetchLeaveSummary = async (token: string, forDate: string) => {
     try {
         return await apiRequest(`/k/leave/api/me/leave/summary?forDate=${forDate}`, token);
     } catch (error) {
-        console.error('Error fetching leave summary:', error);
+        // Re-throw so caller knows it failed, but do not log console.error here
         throw error;
     }
 }
