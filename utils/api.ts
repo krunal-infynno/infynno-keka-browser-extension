@@ -52,8 +52,7 @@ export const fetchAttendanceSummary = async (token: string): Promise<AttendanceD
         }
         return null;
     } catch (error) {
-        // Silently fail to avoid "Errors" tab clutter. The caller will handle missing data.
-        return null;
+        throw error;
     }
 };
 

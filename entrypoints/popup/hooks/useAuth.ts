@@ -75,7 +75,7 @@ export const useAuth = (): UseAuthResult => {
                         // but we'll keep the error setting intent just in case.
                         // However, if we are here, kekaTabs.length > 0.
                     }
-                    setError(`Please open Keka in a tab and log in`);
+                    setError(`Please open ${domain} in a tab and log in`);
                     setLoading(false);
                     return;
                 }
@@ -93,8 +93,14 @@ export const useAuth = (): UseAuthResult => {
 
         // Listen for token updates from background script
         const handleStorageChange = (changes: Record<string, any>, areaName: string) => {
-            if (areaName === "local" && changes.access_token?.newValue) {
-                setAccessToken(changes.access_token.newValue);
+            if (areaName === "local" && changes.access_token) {
+                const newToken = changes.access_token.newValue;
+                setAccessToken(newToken || null);
+
+                // If token was removed/cleared, re-run auth check to show error or finding logical
+                if (!newToken) {
+                    initializeAuth();
+                }
             }
         };
         browser.storage.onChanged.addListener(handleStorageChange);

@@ -112,7 +112,16 @@ async function updateNotificationState(stateKey: keyof NotificationStates, value
 async function handleTokenExpiration(accessToken: string) {
   try {
     // 1. Try to find a fresh token in opened tabs
-    const kekaTabs = await browser.tabs.query({ url: "*://*.infynno.keka.com/*" });
+    const { keka_domain } = await browser.storage.local.get("keka_domain");
+    const domain = (keka_domain as string) || "infynno.keka.com";
+    const hostname = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+    const kekaTabs = await browser.tabs.query({
+      url: [
+        `*://${hostname}/*`,
+        `*://*.${hostname}/*`
+      ]
+    });
     if (kekaTabs.length > 0) {
       const activeTab = kekaTabs.sort((a, b) => (b.active ? 1 : 0) - (a.active ? 1 : 0))[0];
       if (activeTab.id) {
@@ -131,6 +140,13 @@ async function handleTokenExpiration(accessToken: string) {
     }
 
     // 2. If no tab/token found, notify user ONCE per day (only if token is actually missing or invalid)
+
+    // If the token is invalid/expired and we couldn't refresh it from a tab, 
+    // we must clear it so the UI prompts the user to log in again.
+    if (accessToken) {
+      await browser.storage.local.remove("access_token");
+    }
+
     const { tokenExpiredNotifiedToday } = await getNotificationStates();
     if (!tokenExpiredNotifiedToday) {
       await showNotification(
@@ -176,7 +192,9 @@ async function runNotificationLogic() {
     } catch (error) {
       // Whether specific 'Unauthorized' or generic failure, handle as potential expiration
       // and suppress error logging to keep extension logs clean.
-      await handleTokenExpiration(accessToken);
+      if (error instanceof Error && error.message === 'Unauthorized') {
+        await handleTokenExpiration(accessToken);
+      }
       return;
     }
 
