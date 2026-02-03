@@ -484,20 +484,40 @@ export const processMonthlyStats = (
     const daysToDivideBy = currentWorkingDayCount;
     averageHours = daysToDivideBy > 0 ? totalHours / daysToDivideBy : 0;
 
-    if (
-      remainingWorkingDaysCount > 0 &&
-      totalWorkingDaysCount > 0 &&
-      daysToDivideBy > 0 &&
-      averageHours > 0
-    ) {
-      const TARGET_AVERAGE_HOURS = 8.25;
-      const totalHoursNeeded = totalWorkingDaysCount * TARGET_AVERAGE_HOURS;
-      const hoursWorkedSoFar = averageHours * daysToDivideBy;
-      const hoursRemaining = totalHoursNeeded - hoursWorkedSoFar;
-      hoursNeededPerDay = hoursRemaining / remainingWorkingDaysCount;
+    // If it's the first working day (daysToDivideBy === 0), show today's hours as average
+    if (daysToDivideBy === 0) {
+      const todayEntry = attendanceData.find((entry) => {
+        if (!entry.attendanceDate) return false;
+        const entryDate = new Date(entry.attendanceDate);
+        return isSameDay(entryDate, now);
+      });
 
-      if (hoursNeededPerDay < 0) hoursNeededPerDay = 0;
+      if (todayEntry) {
+        // Calculate real-time minutes if possible, similar to weeklystats, or rely on totalEffectiveHours?
+        // monthly usually relies on totalEffectiveHours.
+        // But for "Today", totalEffectiveHours might be stale if not re-calculated.
+        // However, let's use what we have in the entry to be consistent with input.
+        // Actually, let's calculate fresh from timeEntries if possible for accuracy.
+        const { totalWorkedMinutes } = calculateMinutesFromAttendance([todayEntry]);
+        if (totalWorkedMinutes > 0) {
+          averageHours = totalWorkedMinutes / 60;
+        }
+      }
     }
+  }
+
+  // Calculate Needed/Day independently of past attendance check
+  if (remainingWorkingDaysCount > 0 && totalWorkingDaysCount > 0) {
+    const TARGET_AVERAGE_HOURS = 8.25;
+    const totalHoursNeeded = totalWorkingDaysCount * TARGET_AVERAGE_HOURS;
+    const hoursWorkedSoFar = averageHours * currentWorkingDayCount;
+
+    // Ensure we don't have negative remaining due to floating point or over-work
+    const hoursRemaining = Math.max(0, totalHoursNeeded - hoursWorkedSoFar);
+
+    hoursNeededPerDay = hoursRemaining / remainingWorkingDaysCount;
+
+    if (hoursNeededPerDay < 0) hoursNeededPerDay = 0;
   }
 
   return {
@@ -676,12 +696,18 @@ export const processWeeklyStats = (
 
   if (currentWorkingDayCount > 0) {
     averageHours = pastDaysWorkedHours / currentWorkingDayCount;
+  } else if (currentWorkingDayCount === 0 && totalWorkedHours > 0 && !holidayDates.includes(format(now, "yyyy-MM-dd"))) {
+    // If it's the first working day of the week (and not a holiday), show today's total work as average
+    averageHours = totalWorkedHours;
   }
 
-  // Hours Needed Per Day
   let hoursNeededPerDay = 0;
   if (remainingWorkingDaysCount > 0) {
-    hoursNeededPerDay = remainingHours / remainingWorkingDaysCount;
+    const remainingForPeriod = Math.max(
+      0,
+      weeklyTargetHours - pastDaysWorkedHours,
+    );
+    hoursNeededPerDay = remainingForPeriod / remainingWorkingDaysCount;
   }
 
   return {
