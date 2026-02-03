@@ -249,13 +249,13 @@ body {
 }
 
 .attendance-list li.time-entry.not-logged-out {
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
+  background-color: #eff6ff;
+  border-color: #bfdbfe;
 }
 
 .attendance-list li.time-entry.not-logged-out:hover {
-  background-color: #e5e7eb;
-  border-color: #9ca3af;
+  background-color: #dbeafe;
+  border-color: #93c5fd;
 }
 
 .attendance-list li.break-entry {
@@ -686,7 +686,8 @@ body {
   border-radius: 16px;
   width: 100%;
   max-width: 320px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1),
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
     0 8px 10px -6px rgba(0, 0, 0, 0.1);
 }
 
