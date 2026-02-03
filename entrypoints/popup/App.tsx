@@ -48,7 +48,7 @@ function App() {
   } = useCurrentMetrics(isHalfDay);
 
   const [activeTab, setActiveTab] = useState<"today" | "weekly" | "monthly">(
-    "today"
+    "today",
   );
 
   const monthlyStats = useMonthlyStats(accessToken);
@@ -156,7 +156,7 @@ function App() {
                   breaks={breaks}
                   unpairedInEntry={unpairedInEntry}
                   totalWorkedMinutes={totalWorkedMinutes}
-                  hoursNeededPerDay={monthlyStats.hoursNeededPerDay}
+                  hoursNeededPerDay={weeklyStats.hoursNeededPerDay}
                 />
               )}
 
