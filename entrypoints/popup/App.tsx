@@ -48,11 +48,14 @@ function App() {
   } = useCurrentMetrics(isHalfDay);
 
   const [activeTab, setActiveTab] = useState<"today" | "weekly" | "monthly">(
-    "today",
+    "today"
   );
 
-  const monthlyStats = useMonthlyStats(accessToken);
-  const weeklyStats = useWeeklyStats(accessToken, isHalfDay);
+  const [selectedMonth, setSelectedMonth] = useState(new Date());
+  const [selectedWeek, setSelectedWeek] = useState(new Date());
+
+  const monthlyStats = useMonthlyStats(accessToken, selectedMonth);
+  const weeklyStats = useWeeklyStats(accessToken, isHalfDay, selectedWeek);
 
   // Combine loading/error states appropriately
   const appLoading = authLoading || (activeTab === "today" && metricsLoading);
@@ -74,6 +77,14 @@ function App() {
         <div className="header-title">
           <img src="/icon/32.png" alt="logo" className="header-logo" />
           <span>{activeView === "settings" ? "Settings" : "Kivo"}</span>
+          {activeView === "main" && !metricsLoading && (
+            <div
+              className={`status-badge ${!isClockedIn ? "punched-out" : ""}`}
+            >
+              <span className="status-dot" />
+              {isClockedIn ? "Punched In" : "Punched Out"}
+            </div>
+          )}
         </div>
         <button
           className="icon-button"
@@ -97,18 +108,24 @@ function App() {
               <div className="auth-error-subtext">
                 {authError || "Please log in to Keka in a new tab to continue."}
               </div>
+              <button
+                className="open-keka-button"
+                onClick={async () => {
+                  const { keka_domain } = await browser.storage.local.get(
+                    "keka_domain"
+                  );
+                  const kekaDomain = keka_domain as string;
+                  const url = kekaDomain.startsWith("http")
+                    ? kekaDomain
+                    : `https://${kekaDomain}`;
+                  browser.tabs.create({ url });
+                }}
+              >
+                Open Keka
+              </button>
             </div>
           ) : (
             <>
-              {isClockedIn && (
-                <div className="alert-banner clocked-in">
-                  <span className="alert-icon">⚠️</span>
-                  <span className="alert-text">
-                    You're currently clocked in
-                  </span>
-                </div>
-              )}
-
               <div className="tabs-container">
                 <button
                   className={`tab-button ${
@@ -173,6 +190,8 @@ function App() {
                   totalWorkingDays={weeklyStats.totalWorkingDays}
                   currentWorkingDay={weeklyStats.currentWorkingDay}
                   remainingWorkingDays={weeklyStats.remainingWorkingDays}
+                  selectedDate={selectedWeek}
+                  onDateChange={setSelectedWeek}
                 />
               )}
 
@@ -186,6 +205,8 @@ function App() {
                   hoursNeededPerDay={monthlyStats.hoursNeededPerDay}
                   holidaysCount={monthlyStats.holidays.length}
                   leaveDaysCount={monthlyStats.leaveDaysCount}
+                  selectedMonth={selectedMonth}
+                  onMonthChange={setSelectedMonth}
                 />
               )}
             </>

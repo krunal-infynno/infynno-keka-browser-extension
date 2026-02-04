@@ -67,3 +67,39 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+.monthly-header {
+  margin-bottom: 12px;
+}
+
+.month-selector-container {
+  width: 100%;
+}
+
+.month-select {
+  width: 100%;
+  padding: 8px 12px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #374151;
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.month-select:hover {
+  border-color: #d1d5db;
+  background-color: #f9fafb;
+}
+
+.month-select:focus {
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 2px rgba(147, 197, 253, 0.2);
+}
+
+.week-selector-container {
+  width: 100%;
+}

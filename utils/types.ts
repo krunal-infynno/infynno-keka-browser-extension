@@ -127,3 +127,17 @@ export interface WeeklyStats {
   totalWorked: number;
   remaining: number;
 }
+
+export interface RangeStatsResponse {
+  data: {
+    fromDate: string;
+    toDate: string;
+    myStats: {
+      totalEffectiveHours: number;
+      workingDays: number;
+      averageHoursPerDay: number;
+      averageHoursPerDayInHHMM: string;
+      totalEffectiveHoursInHHMM: string;
+    };
+  };
+}

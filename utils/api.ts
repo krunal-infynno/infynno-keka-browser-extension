@@ -44,9 +44,13 @@ const apiRequest = async (endpoint: string, token: string, options: RequestOptio
     return response.json();
 };
 
-export const fetchAttendanceSummary = async (token: string): Promise<AttendanceData[] | null> => {
+export const fetchAttendanceSummary = async (token: string, date?: string): Promise<AttendanceData[] | null> => {
     try {
-        const data = await apiRequest('/k/attendance/api/mytime/attendance/summary', token);
+        let endpoint = '/k/attendance/api/mytime/attendance/summary';
+        if (date) {
+            endpoint += `?date=${date}`;
+        }
+        const data = await apiRequest(endpoint, token);
         if (data && data.data && Array.isArray(data.data)) {
             return data.data;
         }
@@ -56,9 +60,13 @@ export const fetchAttendanceSummary = async (token: string): Promise<AttendanceD
     }
 };
 
-export const fetchHolidays = async (token: string) => {
+export const fetchHolidays = async (token: string, date?: string) => {
     try {
-        return await apiRequest('/k/dashboard/api/dashboard/holidays', token);
+        let endpoint = '/k/dashboard/api/dashboard/holidays';
+        if (date) {
+            endpoint += `?date=${date}`;
+        }
+        return await apiRequest(endpoint, token);
     } catch (error) {
         // Re-throw so caller knows it failed, but do not log console.error here
         throw error;
@@ -70,6 +78,14 @@ export const fetchLeaveSummary = async (token: string, forDate: string) => {
         return await apiRequest(`/k/leave/api/me/leave/summary?forDate=${forDate}`, token);
     } catch (error) {
         // Re-throw so caller knows it failed, but do not log console.error here
+        throw error;
+    }
+}
+
+export const fetchRangeStats = async (token: string, fromDate: string, toDate: string) => {
+    try {
+        return await apiRequest(`/k/attendance/api/mytime/attendance/lastweekstats?fromDate=${fromDate}&toDate=${toDate}`, token);
+    } catch (error) {
         throw error;
     }
 }

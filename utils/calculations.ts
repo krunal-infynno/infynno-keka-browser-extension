@@ -369,8 +369,9 @@ export const processMonthlyStats = (
   attendanceData: AttendanceData[],
   holidaysData: HolidayResponse | null,
   leaveData: LeaveResponse | null,
+  selectedDate: Date = new Date(),
 ): MonthlyStats => {
-  const now = new Date();
+  const now = selectedDate;
   const monthStart = startOfMonth(now);
   const monthEnd = endOfMonth(now);
 
@@ -536,8 +537,9 @@ export const processWeeklyStats = (
   holidaysData: HolidayResponse | null,
   leaveData: LeaveResponse | null,
   isManualHalfDay: boolean,
+  selectedDate: Date = new Date(),
 ): WeeklyStats => {
-  const now = new Date();
+  const now = selectedDate;
   // Use ISO week (Monday start)
   const weekStart = startOfWeek(now, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(now, { weekStartsOn: 1 });

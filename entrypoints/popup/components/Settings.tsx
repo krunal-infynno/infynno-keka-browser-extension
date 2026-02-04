@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { browser } from "wxt/browser";
 
-// ... (imports remain)
 interface SettingsProps {
   isHalfDay: boolean;
   setIsHalfDay: (value: boolean) => void;
