@@ -88,8 +88,8 @@ export const useWeeklyStats = (
               // If we have workingDays (e.g. 5), then target = 5 * 8.25 = 41.25.
               finalStats.weeklyTarget = workingDays * 8.25;
 
-              // Remaining is 0 for past
-              finalStats.remaining = 0;
+              // Remaining calculation - only 0 if target met
+              finalStats.remaining = Math.max(0, finalStats.weeklyTarget - finalStats.totalWorked);
 
               // Update Average Hours
               let avgHoursDec = 0;

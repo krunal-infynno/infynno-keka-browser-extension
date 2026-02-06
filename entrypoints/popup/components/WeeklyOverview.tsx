@@ -130,10 +130,18 @@ export default function WeeklyOverview({
           </div>
 
           <div className="monthly-cards-row">
-            <div className="monthly-card monthly-card-yellow">
+            <div
+              className={`monthly-card ${
+                totalWorked >= weeklyTarget
+                  ? "monthly-card-green"
+                  : "monthly-card-yellow"
+              }`}
+            >
               <div className="monthly-label">Remaining</div>
               <div className="monthly-value">
-                {remaining > 0 ? formatHours(remaining) : "Completed"}
+                {totalWorked < weeklyTarget
+                  ? formatHours(remaining)
+                  : "Completed"}
               </div>
             </div>
             <div className="monthly-card monthly-card-green">
